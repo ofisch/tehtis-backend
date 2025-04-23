@@ -58,7 +58,7 @@ const storage = multer.diskStorage({
     const baseName = path.basename(originalName, extension); // Remove extension from original name
     const uniqueSuffix = Date.now(); // Unique number to prevent overwriting
 
-    cb(null, `${baseName}_${uniqueSuffix}${extension}`); // Example: "cv_onniF_1739952857027.pdf"
+    cb(null, `${baseName}_${uniqueSuffix}${extension}`);
   },
 });
 
