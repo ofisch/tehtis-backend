@@ -6,7 +6,6 @@
     "start": "node server.js",
     "dev": "vite",
     "server": "ts-node server.ts",
-    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
