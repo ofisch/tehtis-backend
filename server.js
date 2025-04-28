@@ -32,7 +32,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false, // vaihdetaan TRUE, jos HTTPS
+      secure: true, // TRUE, jos HTTPS
       httpOnly: true,
       sameSite: "none", // perehdy TÄHÄN
       maxAge: 5 * 60 * 60 * 1000, // 5 tuntia, kunnes sessio vanhenee
