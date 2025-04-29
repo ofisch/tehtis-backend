@@ -25,6 +25,8 @@ app.use(
 
 app.use(bodyParser.json());
 
+const JWT_SECRET = process.env.JWT_SECRET || "asfkfs6k152asfakyxd";
+
 // JWT auth middleware
 function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
