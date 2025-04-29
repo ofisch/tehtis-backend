@@ -34,7 +34,7 @@ app.use(
     cookie: {
       secure: true, // TRUE, jos HTTPS
       httpOnly: true,
-      sameSite: false, // perehdy TÄHÄN
+      sameSite: "none", // perehdy TÄHÄN
       maxAge: 5 * 60 * 60 * 1000, // 5 tuntia, kunnes sessio vanhenee
     },
   })
@@ -145,6 +145,13 @@ db.prepare(
   )
 `
 ).run();
+
+// testataan sessiota
+app.get("/test-session", (req, res) => {
+  if (!req.session.views) req.session.views = 1;
+  else req.session.views++;
+  res.send(`Session views: ${req.session.views}`);
+});
 
 // lisätään uusi tehtäväpalautus
 app.post("/submit-assignment", upload.none(), (req, res) => {
