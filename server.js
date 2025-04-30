@@ -832,7 +832,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // palautetaan index.html kaikille muille reiteille
 app.get("*", (req, res) => {
-  res.redirect("https://users.metropolia.fi/~onnif/tehtis");
+  res.sendFile("https://users.metropolia.fi/~onnif/tehtis/index.html");
 });
 
 app.listen(process.env.PORT, () => {
