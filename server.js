@@ -830,11 +830,6 @@ app.get("/users", (req, res) => {
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// palautetaan index.html kaikille muille reiteille
-app.get("*", (req, res) => {
-  res.sendFile("https://users.metropolia.fi/~onnif/tehtis/index.html");
-});
-
 app.listen(process.env.PORT, () => {
   console.log("Server is running on port: " + process.env.PORT);
   console.log("address: " + process.env.ORIGIN);
