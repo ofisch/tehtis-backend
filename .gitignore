@@ -29,3 +29,6 @@ dist-ssr
 
 # database files
 *.db
+
+dev-env.txt
+prod-env.txt

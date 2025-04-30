@@ -10,7 +10,7 @@ const multer = require("multer");
 const path = require("path");
 
 const fs = require("fs");
-const jw = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 
 const app = express();
 const db = new Database("database.db");
@@ -239,10 +239,11 @@ app.get("/submissions/:assignmentId", (req, res) => {
 // lisätään tiedosto tehtäväpalautukselle
 app.post(
   "/upload/submission/:submissionId",
+  authenticateToken, // ✅ Use JWT middleware
   upload.single("file"),
   (req, res) => {
     const { submissionId } = req.params;
-    const userId = req.session.userId; // Ensure user is logged in
+    const userId = req.user.userId; // ✅ Extract user ID from JWT
 
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -251,14 +252,18 @@ app.post(
     const filename = req.file.filename;
     const filepath = `uploads/${filename}`;
 
-    db.prepare(
-      "INSERT INTO submission_files (filename, path, uploadedBy, submissionId) VALUES (?, ?, ?, ?)"
-    ).run(filename, filepath, userId, submissionId);
+    try {
+      db.prepare(
+        "INSERT INTO submission_files (filename, path, uploadedBy, submissionId) VALUES (?, ?, ?, ?)"
+      ).run(filename, filepath, userId, submissionId);
 
-    res.json({ message: "File uploaded successfully", filepath });
+      res.json({ message: "File uploaded successfully", filepath });
+    } catch (err) {
+      console.error("Submission file upload error:", err);
+      res.status(500).json({ error: "Failed to save submission file" });
+    }
   }
 );
-
 // poistetaan tiedosto tehtäväpalautuksesta
 app.delete("/delete-submission-file/:fileId", (req, res) => {
   const { fileId } = req.params;
@@ -411,23 +416,33 @@ app.post("/update-course/:id", (req, res) => {
 });
 
 // ladataan tiedosto kurssille
-app.post("/upload/course/:courseId", upload.single("file"), (req, res) => {
-  const { courseId } = req.params;
-  const userId = req.session.userId; // Ensure user is logged in
+app.post(
+  "/upload/course/:courseId",
+  authenticateToken, // ✅ JWT middleware
+  upload.single("file"),
+  (req, res) => {
+    const { courseId } = req.params;
+    const userId = req.user.userId; // ✅ Extract from JWT
 
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const filename = req.file.filename;
+    const filepath = `uploads/${filename}`;
+
+    try {
+      db.prepare(
+        "INSERT INTO files (filename, path, uploadedBy, courseId) VALUES (?, ?, ?, ?)"
+      ).run(filename, filepath, userId, courseId);
+
+      res.json({ message: "File uploaded successfully", filepath });
+    } catch (err) {
+      console.error("File upload DB error:", err);
+      res.status(500).json({ error: "Failed to save file info to database" });
+    }
   }
-
-  const filename = req.file.filename;
-  const filepath = `uploads/${filename}`;
-
-  db.prepare(
-    "INSERT INTO files (filename, path, uploadedBy, courseId) VALUES (?, ?, ?, ?)"
-  ).run(filename, filepath, userId, courseId);
-
-  res.json({ message: "File uploaded successfully", filepath });
-});
+);
 
 // poistetaan kurssin tiedostot
 app.delete("/delete-file/:fileId", (req, res) => {
@@ -498,10 +513,11 @@ app.delete("/delete-assignment/:id", (req, res) => {
 // ladataan tiedosto tehtävään
 app.post(
   "/upload/assignment/:assignmentId",
+  authenticateToken, // ✅ JWT auth middleware
   upload.single("file"),
   (req, res) => {
     const { assignmentId } = req.params;
-    const userId = req.session.userId; // Ensure user is logged in
+    const userId = req.user.userId; // ✅ Extracted from decoded JWT
 
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -510,11 +526,16 @@ app.post(
     const filename = req.file.filename;
     const filepath = `uploads/${filename}`;
 
-    db.prepare(
-      "INSERT INTO files (filename, path, uploadedBy, assignmentId) VALUES (?, ?, ?, ?)"
-    ).run(filename, filepath, userId, assignmentId);
+    try {
+      db.prepare(
+        "INSERT INTO files (filename, path, uploadedBy, assignmentId) VALUES (?, ?, ?, ?)"
+      ).run(filename, filepath, userId, assignmentId);
 
-    res.json({ message: "File uploaded successfully", filepath });
+      res.json({ message: "File uploaded successfully", filepath });
+    } catch (err) {
+      console.error("Upload error:", err);
+      res.status(500).json({ error: "Failed to store file" });
+    }
   }
 );
 
@@ -680,16 +701,14 @@ app.post("/remove-member-from-course", (req, res) => {
 });
 
 // haetaan kurssit, joihin käyttäjä osallistuu
-app.get("/my-courses", (req, res) => {
-  if (!req.session.userId) {
-    return res.status(401).json({ error: "User not authenticated" });
-  }
+app.get("/my-courses", authenticateToken, (req, res) => {
+  const userId = req.user.userId;
 
   const rows = db
     .prepare(
       "SELECT courses.id, courses.name, courses.description FROM courses JOIN course_members ON courses.id = course_members.courseId WHERE course_members.userId = ?"
     )
-    .all(req.session.userId);
+    .all(userId);
 
   res.json(rows);
 });
@@ -726,7 +745,7 @@ app.post("/login", (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const token = jw.sign(
+  const token = jwt.sign(
     {
       userId: user.id,
       role: user.role,
@@ -759,6 +778,11 @@ app.post("/register", (req, res) => {
   res.json(info);
 });
 
+app.get("/me", authenticateToken, (req, res) => {
+  const { userId, role, email, firstname, lastname } = req.user;
+  res.json({ userId, role, email, firstname, lastname });
+});
+
 // varmistetaan session olemassaolo
 app.get("/session", (req, res) => {
   const authHeader = req.headers["authorization"];
@@ -768,7 +792,7 @@ app.get("/session", (req, res) => {
     return res.json({ loggedIn: false });
   }
 
-  jw.verify(token, JWT_SECRET, (err, user) => {
+  jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       return res.json({ loggedIn: false });
     }
@@ -786,13 +810,15 @@ app.get("/session", (req, res) => {
 
 // uloskirjautuminen
 app.post("/logout", (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ error: "Logout failed" });
-    }
-    res.clearCookie("connect.sid"); // poistetaan eväste
-    res.json({ message: "Logged out successfully" });
-  });
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(400).json({ error: "No token provided" });
+  }
+
+  // Invalidate the token (this requires implementing a token blacklist mechanism)
+  res.json({ message: "Logged out successfully" });
 });
 
 // haetaan kaikki käyttäjät
